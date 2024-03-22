@@ -2,19 +2,24 @@ package com.tecj.rasfood.controller;
 
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tecj.rasfood.dto.CardapioDto;
 import com.tecj.rasfood.entity.Cardapio;
 import com.tecj.rasfood.repository.CardapioRepository;
-import com.tecj.rasfood.repository.projection.CardapioProjection;
+import com.tecj.rasfood.repository.specification.CardapioSpec;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
-@RequestMapping("/cardapio")
+@RequestMapping(value = "/cardapio")
 @RestController
 public class CardapioController {
 
@@ -24,52 +29,59 @@ public class CardapioController {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @GetMapping()
-    public ResponseEntity<List<Cardapio>> buscarTodosCardapios() {
-        return ResponseEntity.status(HttpStatus.OK).body(cardapioRepository.findAll());
-    }
+    @GetMapping
+    public ResponseEntity<Page<Cardapio>> consultarTodos(@RequestParam("page") Integer page, @RequestParam("size") Integer size,
+                                                         @RequestParam(value = "sort", required = false) Sort.Direction sort,
+                                                         @RequestParam(value = "property", required = false) String property) {
 
-    //    @GetMapping("/categoria/{categoriaId}/disponivel")
-//    public ResponseEntity<List<Cardapio>> buscarTodosCardapiosPorCategoriaDisponivel(@PathVariable("categoriaId") final Integer categoriaId) {
-//        return ResponseEntity.status(HttpStatus.OK).body(cardapioRepository.findAllByCategoria(categoriaId));
-//    }
-    @GetMapping("/categoria/{categoriaId}/disponivel")
-    public ResponseEntity<List<CardapioProjection>> buscarTodosCardapiosPorCategoriaDisponivel(@PathVariable("categoriaId") final Integer categoriaId) {
-        return ResponseEntity.status(HttpStatus.OK).body(cardapioRepository.findAllByCategoria(categoriaId));
+        Pageable pageable = Objects.nonNull(sort)
+                ? PageRequest.of(page, size, Sort.by(sort, property))
+                : PageRequest.of(page, size);
+        return ResponseEntity.status(HttpStatus.OK).body(cardapioRepository.findAll(pageable));
     }
 
     @GetMapping("/nome/{nome}/disponivel")
-    public ResponseEntity<List<CardapioDto>> buscarTodosCardapiosPorNome(@PathVariable("nome") final String nome) {
-        return ResponseEntity.status(HttpStatus.OK).body(cardapioRepository.findByNome(nome));
+    public ResponseEntity<List<Cardapio>> consultarTodos(@PathVariable("nome") final String nome,
+                                                         @RequestParam("page") Integer page, @RequestParam("size") Integer size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.status(HttpStatus.OK).body(cardapioRepository.findAll(Specification
+                        .where(CardapioSpec.nome(nome))
+                        .and(CardapioSpec.disponivel(true))
+                , pageable).getContent());
+    }
+
+    @GetMapping("/categoria/{categoriaId}/disponivel")
+    public ResponseEntity<List<Cardapio>> consultarTodos(@PathVariable("categoriaId") final Integer categoriaId,
+                                                         @RequestParam("page") Integer page, @RequestParam("size") Integer size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.status(HttpStatus.OK).body(cardapioRepository.findAll(Specification
+                .where(CardapioSpec.categoria(categoriaId))
+                .and(CardapioSpec.disponivel(true)), pageable).getContent());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Cardapio> buscarPorId(@PathVariable("id") final Integer id) {
-        return cardapioRepository.findById(id)
-                .map(cardapio -> ResponseEntity.status(HttpStatus.OK).body(cardapio))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    public ResponseEntity<Cardapio> consultarPorId(@PathVariable("id") final Integer id) {
+        Optional<Cardapio> cardapioEncontrado = cardapioRepository.findById(id);
+        if (cardapioEncontrado.isPresent()) {
+            return ResponseEntity.status(HttpStatus.OK).body(cardapioEncontrado.get());
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deletar(@PathVariable("id") final Integer id) throws JsonMappingException {
-        Optional<Cardapio> cardapioEncontrado = this.cardapioRepository.findById(id);
+    public ResponseEntity<?> excluirPorId(@PathVariable("id") final Integer id) {
+        Optional<Cardapio> cardapioEncontrado = cardapioRepository.findById(id);
         if (cardapioEncontrado.isPresent()) {
-            this.cardapioRepository.delete(cardapioEncontrado.get());
+            cardapioRepository.deleteById(id);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).body(null);
         }
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Cardapio não encontrado");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Elemento não encontrado");
     }
 
     @PostMapping
-    public ResponseEntity<Cardapio> criar(@RequestBody final Cardapio cardapio) {
-        Optional<Cardapio> cardaprioEncontrado = this.cardapioRepository.findById(cardapio.getId());
-        if (cardaprioEncontrado.isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(null);
-        }
+    public ResponseEntity<Cardapio> criar(@RequestBody final Cardapio cardapio) throws JsonMappingException {
         return ResponseEntity.status(HttpStatus.CREATED).body(this.cardapioRepository.save(cardapio));
     }
-
 
     @PatchMapping("/{id}")
     public ResponseEntity<Cardapio> atualizar(@PathVariable("id") final Integer id, @RequestBody final Cardapio cardapio) throws JsonMappingException {
@@ -78,8 +90,6 @@ public class CardapioController {
             objectMapper.updateValue(cardapioEncontrado.get(), cardapio);
             return ResponseEntity.status(HttpStatus.OK).body(this.cardapioRepository.save(cardapioEncontrado.get()));
         }
-
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
     }
-
 }

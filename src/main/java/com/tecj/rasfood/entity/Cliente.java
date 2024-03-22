@@ -1,6 +1,5 @@
 package com.tecj.rasfood.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.*;
 
@@ -21,7 +20,7 @@ public class Cliente {
     private Contato contato;
 
     @OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL)
-    private List<Endereco> enderecoList = new ArrayList<>();
+    private final List<Endereco> enderecoList = new ArrayList<>();
 
     public Cliente(String cpf, String email, String nome) {
         this.clienteId = new ClienteId(email, cpf);
