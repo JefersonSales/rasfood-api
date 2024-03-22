@@ -12,9 +12,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -79,8 +82,19 @@ public class CardapioController {
     }
 
     @PostMapping
-    public ResponseEntity<Cardapio> criar(@RequestBody final Cardapio cardapio) throws JsonMappingException {
+    public ResponseEntity<Cardapio> criar(@RequestBody final Cardapio cardapio){
         return ResponseEntity.status(HttpStatus.CREATED).body(this.cardapioRepository.save(cardapio));
+    }
+
+    @PostMapping(value = "/{id}/foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Cardapio> salvarFoto(@PathVariable("id") final Integer id, @RequestPart MultipartFile file) throws IOException {
+        Optional<Cardapio> cardapioEncontrado = this.cardapioRepository.findById(id);
+        if (cardapioEncontrado.isPresent()) {
+          Cardapio cardapio = cardapioEncontrado.get();
+          cardapio.setFoto(file.getBytes());
+            return ResponseEntity.status(HttpStatus.OK).body(this.cardapioRepository.save(cardapioEncontrado.get()));
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
     }
 
     @PatchMapping("/{id}")
